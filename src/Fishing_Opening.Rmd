@@ -1,0 +1,149 @@
+---
+title: "Fishing_Opening"
+output: html_document
+date: "2024-05-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(openxlsx)
+```
+
+
+
+Read in the new data (better formatted here, also includes recreational)
+```{r}
+data<-read_csv(here("data", "RAMP_fishing_master.csv")) %>% mutate(date=as.Date(date, format = "%m/%d/%Y"))
+se1920<-data %>% filter(date<"2020/07/17")
+se2021<-data %>% filter(date<"2021/07/17") %>% filter(date>"2020/07/17")
+se2122<-data %>% filter(date<"2022/07/17") %>% filter(date>"2021/07/17")
+se2223<-data %>% filter(date<"2023/07/17") %>% filter(date>"2022/07/17")
+se2324<-data %>% filter(date<"2024/07/17") %>% filter(date>"2023/07/17")
+```
+
+
+```{r}
+commercial_plot<-function(df, starting_date, ending_date){
+  levels <- c("Closed", "Fleet_Advisory", "30_fathom_depth", "Reduction_50", "40_fathom_depth", "Open")
+  color_scheme <- c("Closed" = "#f0bc68", "Fleet_Advisory" = "#ffb6a3", "30_fathom_depth" = "#aab8bb", "Reduction_50"="#5f9595", "40_fathom_depth"="#c4d7d1", "Open"="#f5d1c3")
+  
+  # Define the labels
+  new_labels <- c("Closed"="Closed", "Fleet_Advisory"="Fleet Advisory", "30_fathom_depth"="30 Fathom Depth Restriction", "Reduction_50"="50% Reduction", "40_fathom_depth"="40 Fathom Depth Restriction", "Open"= "Open")
+  
+  df$com_management_action <- factor(df$com_management_action, levels = levels)
+  
+  date_seq <- seq.Date(as.Date(starting_date), as.Date(ending_date), by = "day")
+  custom_breaks <- date_seq[format(date_seq, "%d") %in% c("01", "15")]
+  month_lines<- date_seq[format(date_seq, "%d") %in% c("01")]
+  
+  ggplot(df, aes(x = date, y = fishing_zone, fill = com_management_action)) +
+    geom_tile() +
+    geom_vline(xintercept = as.numeric(month_lines), color = "black", linetype = "dashed") + #horizontal lines for each month
+    geom_hline(yintercept = seq_along(unique(df$fishing_zone)) - 0.5, color = "black", size = 0.5) +  # Add horizontal lines between fishing zones
+    labs(x = "Date", y = "Fishing Zone", fill = "Management Action") +
+     scale_x_date(breaks = custom_breaks, date_labels = "%Y-%m-%d", limits = c(as.Date(starting_date), as.Date(ending_date))) +
+   scale_y_discrete(limits = c(1, 2, 3, 4, 5, 6)) +
+    theme_minimal() +
+    scale_fill_manual(values = color_scheme, labels = new_labels) +  # Use the color scheme and labels
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.2),
+          # panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()
+    )  # Define y-axis limits
+}
+
+se2324_plot<-commercial_plot(se2324, "2023-11-15", "2024-05-31") #only go through May 31 because this is when we are submitting the report (we cannot know what the future of the fishery looks like)
+se2223_plot<-commercial_plot(se2223, "2022-11-15", "2023-07-15")
+se2122_plot<-commercial_plot(se2122, "2021-11-15", "2022-07-15")
+se2021_plot<-commercial_plot(se2021, "2020-11-15", "2021-07-15")
+se1920_plot<-commercial_plot(se1920, "2019-11-15", "2020-07-15")
+
+ggsave(path=here("plots"), plot=se2324_plot, filename="com_2324.jpeg", width=10)
+ggsave(path=here("plots"), plot=se2223_plot, filename="com_2223.jpeg", width=10)
+ggsave(path=here("plots"), plot=se2122_plot, filename="com_2122.jpeg", width=10)
+ggsave(path=here("plots"), plot=se2021_plot, filename="com_2021.jpeg", width=10)
+ggsave(path=here("plots"), plot=se1920_plot, filename="com_1920.jpeg", width=10)
+```
+
+
+# Recreational 
+```{r}
+rec_plot<-function(df, starting_date, ending_date){
+  levels <- c("Closed", "Fleet_Advisory", "Trap_Prohibition", "Open", "Future")
+  color_scheme <- c("Closed" = "#f0bc68", "Fleet_Advisory" = "#ffb6a3", "Trap_Prohibition" = "#aab8bb", "Open"="#f5d1c3", "Future"="#5f9595")
+  
+  # Define the labels
+  new_labels <- c("Closed"="Closed", "Fleet_Advisory"="Fleet Advisory", "Trap_Prohibition"="Trap Prohibition", "Open"="Open", "Future"="Future")
+  
+  df$rec_management_action <- factor(df$rec_management_action, levels = levels)
+  
+  date_seq <- seq.Date(as.Date(starting_date), as.Date(ending_date), by = "day")
+  custom_breaks <- date_seq[format(date_seq, "%d") %in% c("01", "15")]
+  month_lines<- date_seq[format(date_seq, "%d") %in% c("01")]
+  
+  ggplot(df, aes(x = date, y = fishing_zone, fill = rec_management_action)) +
+    geom_tile() +
+    geom_vline(xintercept = as.numeric(month_lines), color = "black", linetype = "dashed") + #horizontal lines for each month
+    geom_hline(yintercept = seq_along(unique(df$fishing_zone)) - 0.5, color = "black", size = 0.5) +  # Add horizontal lines between fishing zones
+    labs(x = "Date", y = "Fishing Zone", fill = "Management Action") +
+     scale_x_date(breaks = custom_breaks, date_labels = "%Y-%m-%d", limits = c(as.Date(starting_date), as.Date(ending_date))) +
+   scale_y_discrete(limits = c(1, 2, 3, 4, 5, 6)) +
+    theme_minimal() +
+    scale_fill_manual(values = color_scheme, labels = new_labels) +  # Use the color scheme and labels
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.2),
+          # panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()
+    )  # Define y-axis limits
+}
+
+se2324_recplot<-rec_plot(se2324, "2023-10-28", "2024-05-31") #only go through May 31 because this is when we are submitting the report (we cannot know what the future of the fishery looks like)
+se2223_recplot<-rec_plot(se2223, "2022-10-28", "2023-07-30")
+se2122_recplot<-rec_plot(se2122, "2021-10-28", "2022-07-30")
+
+ggsave(path=here("plots"), plot=se2324_recplot, filename="rec_2324.jpeg", width=10)
+ggsave(path=here("plots"), plot=se2223_recplot, filename="rec_2223.jpeg", width=10)
+ggsave(path=here("plots"), plot=se2122_recplot, filename="rec_2122.jpeg", width=10)
+```
+
+
+
+
+##OLD CODE
+
+Load in the data and make a new df for each fishing year
+Remove fleet_advisory from the management action column when it is in combination with another action since it is implied when there is a depth restriction etc.
+Also change delay to closed (they essentially mean the same thing)
+```{r}
+# data<-read_csv(here("data", "RAMP_Zone_Status - Commercial.csv")) %>% 
+#   mutate(management_action=str_replace_all(string=management_action, pattern="Fleet_Advisory, ", replacement="")) %>%  #remove fleet_advisory when in combination with other things (it is implied)
+#   mutate(management_action=str_replace_all(string=management_action, pattern="Delay", replacement="Closed"))
+# se1920<-data %>% filter(start_date<"2020-07-17")
+# se2021<-data %>% filter(start_date<"2021-07-17") %>% filter(start_date>"2020-07-17")
+# se2122<-data %>% filter(start_date<"2022-07-17") %>% filter(start_date>"2021-07-17")
+# se2223<-data %>% filter(start_date<"2023-07-17") %>% filter(start_date>"2022-07-17")
+# se2324<-data %>% filter(start_date<"2024-07-17") %>% filter(start_date>"2023-07-17")
+```
+
+This function makes my data frame better for plotting purposes (creates a new row for each unique date). 
+```{r}
+# expand_dates <- function(df) {
+#   df %>%
+#     rowwise() %>%
+#     mutate(date = list(seq(start_date, end_date, by = "day"))) %>%
+#     unnest(date) %>%
+#     select(date, fishing_zone, management_action, zone_1, zone_2, zone_3, zone_4, zone_5, zone_6)
+# }
+# 
+# se1920<-expand_dates(se1920)
+# se2021<-expand_dates(se2021)
+# se2122<-expand_dates(se2122)
+# se2223<-expand_dates(se2223)
+# se2324<-expand_dates(se2324)
+# 
+# master<-rbind(se1920, se2021, se2122, se2223, se2324)
+# # write.xlsx(master, here("data", "RAMP_master_com_only.xlsx"))
+```
+
